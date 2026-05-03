@@ -2,8 +2,10 @@ import {
   type CacheInstance,
   type RenderRecord,
   type RuntimeSnapshot,
+  type SlotInfo,
   PROTOCOL_VERSION,
 } from "@rcd/protocol";
+import { previewValue } from "./preview.js";
 
 const MAX_RENDERS_PER_CACHE = 64;
 
@@ -57,13 +59,13 @@ export class RuntimeStore {
     return record;
   }
 
-  recordSlot(rawArray: object, slot: number, status: "hit" | "miss"): void {
+  recordSlotRead(rawArray: object, slot: number, status: "hit" | "miss"): void {
     const instance = this.caches.get(rawArray);
     if (!instance) return;
     const render = instance.recentRenders[instance.recentRenders.length - 1];
     if (!render) return;
     if (render.slots[slot] !== undefined) return; // first read wins per slot per render
-    render.slots[slot] = status;
+    render.slots[slot] = { status };
     if (status === "hit") {
       render.hitCount++;
       instance.totalHits++;
@@ -71,6 +73,28 @@ export class RuntimeStore {
       render.missCount++;
       instance.totalMisses++;
     }
+  }
+
+  /**
+   * Called by the shim when compiled code writes a slot. The slot is
+   * effectively being recomputed — we capture both what was there before
+   * (the cached value from the previous render) and what's being stored now,
+   * so the panel can answer "what changed between renders?" per-slot.
+   */
+  recordSlotWrite(rawArray: object, slot: number, oldValue: unknown, newValue: unknown): void {
+    const instance = this.caches.get(rawArray);
+    if (!instance) return;
+    const render = instance.recentRenders[instance.recentRenders.length - 1];
+    if (!render) return;
+    const existing: SlotInfo = render.slots[slot] ?? { status: "miss" };
+    render.slots[slot] = {
+      ...existing,
+      // The write itself proves a recompute happened — promote to miss even if
+      // we didn't see a sentinel read first (some compiled patterns write without reading).
+      status: existing.status === "hit" ? "hit" : "miss",
+      valuePreview: previewValue(newValue),
+      prevPreview: previewValue(oldValue),
+    };
   }
 
   endRender(rawArray: object): void {

@@ -128,10 +128,21 @@ body {
 .rcd-render-grid { display: flex; gap: 2px; overflow-x: auto; padding: 6px 0; }
 .rcd-render-col { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .rcd-render-id { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
-.rcd-slot { width: 14px; height: 14px; border-radius: 2px; }
+.rcd-slot { width: 14px; height: 14px; border-radius: 2px; border: none; padding: 0; cursor: pointer; }
 .rcd-slot-hit { background: var(--ok); }
 .rcd-slot-miss { background: var(--bad); }
 .rcd-slot-cold { background: var(--panel-2); border: 1px solid var(--border); }
+.rcd-slot-selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.rcd-slot-detail { margin-top: 12px; padding: 10px 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; }
+.rcd-slot-detail header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.rcd-slot-detail header > .rcd-btn { margin-left: auto; }
+.rcd-slot-diff { width: 100%; border-collapse: collapse; font-size: 11px; }
+.rcd-slot-diff th { text-align: left; padding: 4px 10px 4px 0; color: var(--muted); font-weight: 500; vertical-align: top; width: 80px; }
+.rcd-slot-diff td { padding: 4px 0; }
+.rcd-slot-diff tr:first-child td code { background: rgba(242, 95, 92, 0.12); color: var(--bad); }
+.rcd-slot-diff tr:last-child td code { background: rgba(90, 209, 122, 0.12); color: var(--ok); }
+.rcd-slot-diff code { display: inline-block; padding: 2px 6px; word-break: break-all; }
 
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; background: rgba(110, 168, 255, 0.1); padding: 1px 4px; border-radius: 3px; }
 

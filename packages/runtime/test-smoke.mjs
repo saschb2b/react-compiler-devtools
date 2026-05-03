@@ -50,7 +50,7 @@ console.log(JSON.stringify({
     totalRenders: cache.totalRenders,
     totalHits: cache.totalHits,
     totalMisses: cache.totalMisses,
-    slots: cache.recentRenders.flatMap((r) => r.slots),
+    slots: cache.recentRenders.flatMap((r) => r.slots.map((s) => s?.status)),
   })),
 }, null, 2));
 

@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import type { CacheInstance, Manifest, RuntimeSnapshot } from "@rcd/protocol";
+import type { CacheInstance, Manifest, RenderRecord, RuntimeSnapshot, SlotInfo } from "@rcd/protocol";
 
 export function RuntimeInspector({
   manifest,
@@ -24,8 +24,8 @@ export function RuntimeInspector({
     <section className="rcd-section">
       <h2>Runtime cache inspector</h2>
       <p className="rcd-muted">
-        Live view of every <code>_c(N)</code> cache the compiler instantiated. Each row is one
-        component instance.
+        Live view of every <code>_c(N)</code> cache the compiler instantiated. Click a slot to
+        see what changed.
       </p>
       <CacheTable caches={snapshot.caches} manifest={manifest} />
     </section>
@@ -98,30 +98,136 @@ function CacheTable({
 }
 
 function CacheDetail({ cache, manifest: _manifest }: { cache: CacheInstance; manifest: Manifest | null }) {
+  const [selected, setSelected] = useState<{ renderId: number; slot: number } | null>(null);
+  const selectedRender = selected ? cache.recentRenders.find((r) => r.renderId === selected.renderId) : null;
+  const selectedInfo = selectedRender && selected ? selectedRender.slots[selected.slot] : null;
+
   return (
     <div className="rcd-cache-detail">
       <h4>Recent renders (newest last)</h4>
       <div className="rcd-render-grid">
         {cache.recentRenders.map((r) => (
-          <div key={r.renderId} className="rcd-render-col">
-            <div className="rcd-render-id">#{r.renderId}</div>
-            {Array.from({ length: cache.cacheSize }).map((_, slot) => {
-              const status = r.slots[slot];
-              const cls =
-                status === "hit"
-                  ? "rcd-slot rcd-slot-hit"
-                  : status === "miss"
-                  ? "rcd-slot rcd-slot-miss"
-                  : "rcd-slot rcd-slot-cold";
-              return <div key={slot} className={cls} title={`slot ${slot}: ${status ?? "untouched"}`} />;
-            })}
-          </div>
+          <RenderColumn
+            key={r.renderId}
+            render={r}
+            cacheSize={cache.cacheSize}
+            selected={selected}
+            onSelect={(slot) => setSelected({ renderId: r.renderId, slot })}
+          />
         ))}
       </div>
-      <p className="rcd-muted rcd-footnote">
-        Green = hit (memoized value reused). Red = miss (slot recomputed). Grey = slot not read on
-        that render.
-      </p>
+      {selectedInfo ? (
+        <SlotDetail
+          renderId={selected!.renderId}
+          slot={selected!.slot}
+          info={selectedInfo}
+          onClose={() => setSelected(null)}
+        />
+      ) : (
+        <p className="rcd-muted rcd-footnote">
+          Green = hit · red = miss · grey = untouched. Click a slot to see its old/new value.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function RenderColumn({
+  render,
+  cacheSize,
+  selected,
+  onSelect,
+}: {
+  render: RenderRecord;
+  cacheSize: number;
+  selected: { renderId: number; slot: number } | null;
+  onSelect: (slot: number) => void;
+}) {
+  return (
+    <div className="rcd-render-col">
+      <div className="rcd-render-id">#{render.renderId}</div>
+      {Array.from({ length: cacheSize }).map((_, slot) => {
+        const info = render.slots[slot];
+        const status = info?.status;
+        const isSelected = selected?.renderId === render.renderId && selected?.slot === slot;
+        const cls = [
+          "rcd-slot",
+          status === "hit" ? "rcd-slot-hit" : status === "miss" ? "rcd-slot-miss" : "rcd-slot-cold",
+          isSelected ? "rcd-slot-selected" : "",
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return (
+          <button
+            key={slot}
+            type="button"
+            className={cls}
+            onClick={() => onSelect(slot)}
+            title={`slot ${slot}: ${status ?? "untouched"}${info?.valuePreview ? " · click for details" : ""}`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function SlotDetail({
+  renderId,
+  slot,
+  info,
+  onClose,
+}: {
+  renderId: number;
+  slot: number;
+  info: SlotInfo;
+  onClose: () => void;
+}) {
+  return (
+    <div className="rcd-slot-detail">
+      <header>
+        <strong>
+          Slot {slot} · render #{renderId}
+        </strong>
+        <span className={`rcd-pill rcd-pill-${info.status === "hit" ? "compiled" : "errored"}`}>
+          {info.status}
+        </span>
+        <button type="button" className="rcd-btn rcd-btn-small" onClick={onClose}>
+          Close
+        </button>
+      </header>
+      {info.status === "miss" ? (
+        info.prevPreview != null && info.valuePreview != null ? (
+          <table className="rcd-slot-diff">
+            <tbody>
+              <tr>
+                <th>Previous</th>
+                <td>
+                  <code>{info.prevPreview}</code>
+                </td>
+              </tr>
+              <tr>
+                <th>New</th>
+                <td>
+                  <code>{info.valuePreview}</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p className="rcd-muted">
+            Slot was read as cold (sentinel) but never written this render — likely a slot that
+            stores a dependency the compiler tracks for downstream slots.
+          </p>
+        )
+      ) : (
+        info.valuePreview != null ? (
+          <p>
+            Cached value: <code>{info.valuePreview}</code>
+          </p>
+        ) : (
+          <p className="rcd-muted">Slot held a memoized value (no recompute on this render).</p>
+        )
+      )}
     </div>
   );
 }

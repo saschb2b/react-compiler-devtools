@@ -31,10 +31,7 @@ export function c(size: number): unknown[] {
         const idx = toIndex(prop);
         if (idx !== null) {
           const value = (target as unknown[])[idx];
-          runtime.store.recordSlot(target, idx, value === SENTINEL ? "miss" : "hit");
-          // After the last read of the render, fire endRender. We don't know which read is the
-          // last, so we close out on the next render via beginRender's listeners and on every
-          // write. A simpler heuristic: queue a microtask to close out the render on the same tick.
+          runtime.store.recordSlotRead(target, idx, value === SENTINEL ? "miss" : "hit");
           scheduleEnd(target);
           return value;
         }
@@ -42,8 +39,16 @@ export function c(size: number): unknown[] {
       return Reflect.get(target, prop, receiver);
     },
     set(target, prop, value, receiver) {
-      // Writes happen on a miss path: compiled code stashes the recomputed value back into the slot.
-      // We don't double-count — `recordSlot` is keyed first-write-wins in the store.
+      // Writes are the recompute path: compiled code stashes the new value back. Capture
+      // both old (the cached value from the previous render) and new so the panel can
+      // explain "what changed".
+      if (typeof prop === "string") {
+        const idx = toIndex(prop);
+        if (idx !== null) {
+          const oldValue = (target as unknown[])[idx];
+          runtime.store.recordSlotWrite(target, idx, oldValue, value);
+        }
+      }
       const ok = Reflect.set(target, prop, value, receiver);
       scheduleEnd(target);
       return ok;

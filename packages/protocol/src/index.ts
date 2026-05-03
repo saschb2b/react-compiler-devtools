@@ -112,17 +112,21 @@ export function emptyManifest(rootDir: string): Manifest {
 
 export type SlotStatus = "hit" | "miss";
 
-export interface SlotAccess {
-  slot: number;
+export interface SlotInfo {
   status: SlotStatus;
+  /** Bounded preview of the cached value AFTER the (possible) write on this render. */
+  valuePreview?: string;
+  /** Bounded preview of the value the slot held BEFORE the write (i.e. the cached value from
+   *  the previous render). Set only on `miss`, since hits don't change the value. */
+  prevPreview?: string;
 }
 
 export interface RenderRecord {
   /** Monotonic counter, scoped per cache instance. */
   renderId: number;
   timestamp: number;
-  /** `slots[i]` is the access status observed for slot `i` on this render, or undefined if never read. */
-  slots: Array<SlotStatus | undefined>;
+  /** `slots[i]` is the access info observed for slot `i` on this render, or undefined if never touched. */
+  slots: Array<SlotInfo | undefined>;
   hitCount: number;
   missCount: number;
 }
