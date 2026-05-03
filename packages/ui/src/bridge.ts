@@ -22,6 +22,12 @@ export interface Transport {
 }
 
 export function mountInPage(): Transport {
+  // When the panel is hosted in an iframe (Vite overlay), the runtime lives
+  // in the parent. Outgoing messages must reach the parent's window so the
+  // runtime's listener fires; incoming messages are forwarded into us by the
+  // parent's overlay snippet, so listening on our own window is correct.
+  const isIframe = typeof window !== "undefined" && window.parent !== window;
+  const target = isIframe ? window.parent : window;
   return {
     async fetchManifest() {
       const res = await fetch(MANIFEST_ENDPOINT, { cache: "no-store" });
@@ -36,7 +42,7 @@ export function mountInPage(): Transport {
       return () => window.removeEventListener("message", listener);
     },
     postRuntimeMessage(msg) {
-      window.postMessage(msg, "*");
+      target.postMessage(msg, "*");
     },
   };
 }

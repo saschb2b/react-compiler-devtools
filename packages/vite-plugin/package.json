@@ -23,7 +23,8 @@
     "@babel/core": "^7.25.0",
     "@rcd/babel-preset": "workspace:*",
     "@rcd/meta-plugin": "workspace:*",
-    "@rcd/protocol": "workspace:*"
+    "@rcd/protocol": "workspace:*",
+    "@rcd/ui": "workspace:^"
   },
   "peerDependencies": {
     "vite": "^5.0.0 || ^6.0.0"

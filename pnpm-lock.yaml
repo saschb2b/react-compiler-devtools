@@ -259,6 +259,9 @@ importers:
       '@rcd/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@rcd/ui':
+        specifier: workspace:^
+        version: link:../ui
     devDependencies:
       '@types/babel__core':
         specifier: ^7.20.5

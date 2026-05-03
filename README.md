@@ -50,9 +50,10 @@ export default defineConfig({
 });
 ```
 
-Open the app, then load the panel one of two ways:
+Open the app — a small **⚛ Compiler** toggle appears bottom-right. Click it to open the panel as an in-page overlay. Same panel, three ways to host it:
 
-- **Chrome extension** — load `packages/extension/dist-extension` as an unpacked extension, then open DevTools and switch to the **React Compiler** tab.
+- **Vite overlay** (default) — togglable iframe injected by the plugin in dev. Disable with `reactCompilerDevtools({ overlay: false })`.
+- **Chrome extension** — load `packages/extension/dist-extension` as an unpacked extension, then open DevTools → **React Compiler** tab. Useful when you want the panel docked inside DevTools.
 - **Standalone** — open `http://localhost:5173/__rcd/manifest.json` to verify the manifest is being served, then run `pnpm --filter @rcd/ui dev` and point it at your app's origin.
 
 ### Next.js (15+, App Router)

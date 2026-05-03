@@ -17,6 +17,7 @@ export default defineConfig({
 | `compilerOptions` | `{}`                                   | Passed through to `babel-plugin-react-compiler`.                       |
 | `manifestPath`    | `node_modules/.rcd/manifest.json`      | Where to write the manifest.                                           |
 | `runtime`         | `true`                                 | Set `false` to disable the dev runtime alias (build manifest only).    |
+| `overlay`         | `true`                                 | Set `false` to skip injecting the in-page panel toggle in dev.         |
 | `include`/`exclude` | `/\.[jt]sx?$/` / `/node_modules/`    | Module-id matchers.                                                    |
 
-The manifest is also served live at `/__rcd/manifest.json`. Production builds (`vite build`) skip the runtime alias entirely.
+The manifest is served live at `/__rcd/manifest.json` and the panel at `/__rcd/panel/standalone.html`. Production builds (`vite build`) skip the runtime alias and overlay entirely.
