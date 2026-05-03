@@ -9,6 +9,17 @@ export const PROTOCOL_VERSION = "1";
 export const GLOBAL_KEY = "__REACT_COMPILER_DEVTOOLS__";
 
 export const MANIFEST_ENDPOINT = "/__rcd/manifest.json";
+export const SOURCE_ENDPOINT = "/__rcd/source.json";
+
+export interface SourcePair {
+  /** The user's original source. */
+  original: string;
+  /** The post-compile JS — what the runtime actually executes. */
+  compiled: string;
+  /** Best-effort filename so the panel can show extension-aware highlighting. */
+  filename: string;
+  relativePath: string;
+}
 
 export interface SourceLoc {
   start: { line: number; column: number };

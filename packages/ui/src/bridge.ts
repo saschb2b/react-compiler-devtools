@@ -2,7 +2,9 @@ import {
   type BridgeMessage,
   type Manifest,
   type RuntimeSnapshot,
+  type SourcePair,
   MANIFEST_ENDPOINT,
+  SOURCE_ENDPOINT,
   isBridgeMessage,
 } from "@rcd/protocol";
 
@@ -17,6 +19,7 @@ import {
  */
 export interface Transport {
   fetchManifest(): Promise<Manifest | null>;
+  fetchSource(filename: string): Promise<SourcePair | null>;
   onRuntimeMessage(handler: (msg: BridgeMessage) => void): () => void;
   postRuntimeMessage(msg: BridgeMessage): void;
 }
@@ -33,6 +36,12 @@ export function mountInPage(): Transport {
       const res = await fetch(MANIFEST_ENDPOINT, { cache: "no-store" });
       if (!res.ok) return null;
       return (await res.json()) as Manifest | null;
+    },
+    async fetchSource(filename) {
+      const url = `${SOURCE_ENDPOINT}?file=${encodeURIComponent(filename)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) return null;
+      return (await res.json()) as SourcePair | null;
     },
     onRuntimeMessage(handler) {
       const listener = (event: MessageEvent) => {

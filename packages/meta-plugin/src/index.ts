@@ -4,6 +4,7 @@ import {
   type ManifestFile,
   type ManifestFunction,
   type SourceLoc,
+  type SourcePair,
 } from "@rcd/protocol";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -73,6 +74,12 @@ export class MetaCollector {
    * enrich themselves from this cache when it's their turn.
    */
   private observed = new Map<string, Map<string, ObservedFunction>>();
+  /**
+   * Per-file `{ original, compiled }` source kept in memory only — never
+   * written to the manifest because it can be MBs across a large app and
+   * the panel only needs it on demand. Served via `getSource(filename)`.
+   */
+  private sources = new Map<string, { original: string; compiled: string }>();
 
   constructor(options: MetaCollectorOptions) {
     this.options = {
@@ -90,21 +97,41 @@ export class MetaCollector {
 
   /** Drop everything we've collected for `filename`. Call this before re-compiling a changed file. */
   resetFile(filename: string): void {
-    const file = this.manifest.files[filename];
+    const key = norm(filename);
+    const file = this.manifest.files[key];
     if (file) {
       this.subtractFromSummary(file);
-      delete this.manifest.files[filename];
+      delete this.manifest.files[key];
     }
-    this.observed.delete(filename);
+    this.observed.delete(key);
+    this.sources.delete(key);
     this.scheduleWrite();
+  }
+
+  /** Stash the pre/post compile source so the panel can render the diff. */
+  recordSource(filename: string, original: string, compiled: string): void {
+    this.sources.set(norm(filename), { original, compiled });
+  }
+
+  getSource(filename: string): SourcePair | null {
+    const key = norm(filename);
+    const pair = this.sources.get(key);
+    if (!pair) return null;
+    const file = this.manifest.files[key];
+    return {
+      ...pair,
+      filename: key,
+      relativePath: file?.relativePath ?? key,
+    };
   }
 
   /** Called by the babel companion (which runs first) for every top-level component-shaped function. */
   observeFunction(filename: string, fn: ObservedFunction): void {
-    let map = this.observed.get(filename);
+    const key = norm(filename);
+    let map = this.observed.get(key);
     if (!map) {
       map = new Map();
-      this.observed.set(filename, map);
+      this.observed.set(key, map);
     }
     const id = `:${fn.loc.start.line}:${fn.loc.start.column}`;
     const existing = map.get(id);
@@ -119,8 +146,9 @@ export class MetaCollector {
   /** The babel plugin calls this for every Compiler event keyed to `filename`. */
   recordEvent(filename: string | null, event: CompilerLoggerEvent): void {
     if (!filename) return;
-    const file = this.ensureFile(filename);
-    const observed = this.observed.get(filename);
+    const key = norm(filename);
+    const file = this.ensureFile(key);
+    const observed = this.observed.get(key);
 
     switch (event.kind) {
       case "CompileSuccess":
@@ -344,6 +372,11 @@ function makeId(loc: SourceLoc): string {
 function toRelative(rootDir: string, filename: string): string {
   const rel = relative(rootDir, filename).replaceAll("\\", "/");
   return rel === "" ? filename : rel;
+}
+
+/** Normalize all path separators to forward slashes — manifest keys are platform-agnostic. */
+function norm(filename: string): string {
+  return filename.replaceAll("\\", "/");
 }
 
 export type { Manifest, ManifestFile, ManifestFunction } from "@rcd/protocol";

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Manifest, ManifestFile, ManifestFunction } from "@rcd/protocol";
+import { useSourcePair } from "../store";
+import { SourceDiff } from "./SourceDiff";
 
 export function FileExplorer({ manifest }: { manifest: Manifest }) {
   const files = useMemo(
@@ -53,28 +55,59 @@ function FileBadge({ file }: { file: ManifestFile }) {
 }
 
 function FileDetail({ file }: { file: ManifestFile }) {
+  const [view, setView] = useState<"functions" | "diff">("functions");
   return (
     <div>
-      <h2>
-        <code>{file.relativePath}</code>
-      </h2>
+      <header className="rcd-detail-header">
+        <h2>
+          <code>{file.relativePath}</code>
+        </h2>
+        <div className="rcd-tabs rcd-tabs-mini">
+          <button
+            type="button"
+            className={view === "functions" ? "rcd-tab rcd-tab-active" : "rcd-tab"}
+            onClick={() => setView("functions")}
+          >
+            Functions
+          </button>
+          <button
+            type="button"
+            className={view === "diff" ? "rcd-tab rcd-tab-active" : "rcd-tab"}
+            onClick={() => setView("diff")}
+          >
+            Source ↔ Compiled
+          </button>
+        </div>
+      </header>
       {file.totalTimingMs != null && (
         <p className="rcd-muted">Compiled in {file.totalTimingMs.toFixed(1)} ms</p>
       )}
-      {file.functions.length === 0 ? (
-        <p className="rcd-muted">No top-level functions detected.</p>
+      {view === "functions" ? (
+        file.functions.length === 0 ? (
+          <p className="rcd-muted">No top-level functions detected.</p>
+        ) : (
+          <ul className="rcd-fn-list">
+            {file.functions
+              .slice()
+              .sort((a, b) => a.loc.start.line - b.loc.start.line)
+              .map((fn) => (
+                <FunctionCard key={fn.id} fn={fn} />
+              ))}
+          </ul>
+        )
       ) : (
-        <ul className="rcd-fn-list">
-          {file.functions
-            .slice()
-            .sort((a, b) => a.loc.start.line - b.loc.start.line)
-            .map((fn) => (
-              <FunctionCard key={fn.id} fn={fn} />
-            ))}
-        </ul>
+        <FileDiffView filename={file.filename} />
       )}
     </div>
   );
+}
+
+function FileDiffView({ filename }: { filename: string }) {
+  const { pair, loading, error } = useSourcePair(filename);
+  if (loading) return <p className="rcd-muted">Loading source…</p>;
+  if (error) return <p className="rcd-error">Failed to load source: {error}</p>;
+  if (!pair) return <p className="rcd-muted">No source captured for this file yet.</p>;
+  return <SourceDiff pair={pair} />;
 }
 
 function FunctionCard({ fn }: { fn: ManifestFunction }) {

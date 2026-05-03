@@ -1,8 +1,9 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   type BridgeMessage,
   type Manifest,
   type RuntimeSnapshot,
+  type SourcePair,
 } from "@rcd/protocol";
 import type { Transport } from "./bridge";
 
@@ -130,4 +131,41 @@ export function useManifestPolling(intervalMs = 1500): void {
     const id = setInterval(refreshManifest, intervalMs);
     return () => clearInterval(id);
   }, [intervalMs, refreshManifest]);
+}
+
+/** Lazily fetch the {original, compiled} source pair for a file. */
+export function useSourcePair(filename: string | null): {
+  pair: SourcePair | null;
+  loading: boolean;
+  error: string | null;
+} {
+  const [pair, setPair] = useState<SourcePair | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!filename) {
+      setPair(null);
+      return;
+    }
+    if (!transportRef) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    transportRef
+      .fetchSource(filename)
+      .then((p) => {
+        if (cancelled) return;
+        setPair(p);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [filename]);
+  return { pair, loading, error };
 }

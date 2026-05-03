@@ -1,5 +1,5 @@
 import { MetaCollector } from "@rcd/meta-plugin";
-import { MANIFEST_ENDPOINT } from "@rcd/protocol";
+import { MANIFEST_ENDPOINT, SOURCE_ENDPOINT } from "@rcd/protocol";
 import { resolve } from "node:path";
 import { createRequire } from "node:module";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -180,4 +180,28 @@ export function createManifestHandler(): (req: IncomingMessage, res: ServerRespo
   };
 }
 
-export { MANIFEST_ENDPOINT };
+/**
+ * Drop-in route handler for `app/__rcd/source/route.ts` exposing the per-file
+ * source pair at {@link SOURCE_ENDPOINT}.
+ */
+export function createSourceHandler(): (req: IncomingMessage, res: ServerResponse) => void {
+  return (req, res) => {
+    const reg = (globalThis as Record<string, unknown>)[PROCESS_COLLECTORS] as
+      | Map<string, MetaCollector>
+      | undefined;
+    const collector = reg ? [...reg.values()][0] : undefined;
+    const url = new URL(req.url ?? "/", "http://x");
+    const file = url.searchParams.get("file");
+    const pair = file && collector ? collector.getSource(file) : null;
+    res.setHeader("content-type", "application/json");
+    res.setHeader("access-control-allow-origin", "*");
+    if (!pair) {
+      res.statusCode = 404;
+      res.end("null");
+    } else {
+      res.end(JSON.stringify(pair));
+    }
+  };
+}
+
+export { MANIFEST_ENDPOINT, SOURCE_ENDPOINT };

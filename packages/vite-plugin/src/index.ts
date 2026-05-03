@@ -1,7 +1,7 @@
 import { transformAsync } from "@babel/core";
 import rcdPreset from "@rcd/babel-preset";
 import { MetaCollector } from "@rcd/meta-plugin";
-import { MANIFEST_ENDPOINT } from "@rcd/protocol";
+import { MANIFEST_ENDPOINT, SOURCE_ENDPOINT } from "@rcd/protocol";
 import { standaloneDir } from "@rcd/ui/standalone";
 import type { Plugin, ViteDevServer } from "vite";
 import { existsSync, readFileSync } from "node:fs";
@@ -101,6 +101,21 @@ export function reactCompilerDevtools(options: ReactCompilerDevtoolsOptions = {}
           return;
         }
 
+        if (req.url.startsWith(SOURCE_ENDPOINT)) {
+          const url = new URL(req.url, "http://x");
+          const file = url.searchParams.get("file");
+          const pair = file && collector ? collector.getSource(file) : null;
+          res.setHeader("content-type", "application/json");
+          res.setHeader("access-control-allow-origin", "*");
+          if (!pair) {
+            res.statusCode = 404;
+            res.end("null");
+          } else {
+            res.end(JSON.stringify(pair));
+          }
+          return;
+        }
+
         if (overlayEnabled && req.url.startsWith(PANEL_BASE)) {
           servePanelAsset(req.url.slice(PANEL_BASE.length), res, next);
           return;
@@ -133,6 +148,7 @@ export function reactCompilerDevtools(options: ReactCompilerDevtoolsOptions = {}
       });
 
       if (!result || result.code == null) return null;
+      collector.recordSource(id, code, result.code);
       return { code: result.code, map: result.map ?? undefined };
     },
   };

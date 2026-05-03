@@ -46,6 +46,7 @@ function rcdLoader(this: LoaderContext, source: string): void {
         callback(null, source);
         return;
       }
+      collector.recordSource(this.resourcePath, source, result.code);
       callback(null, result.code, result.map ?? undefined);
     })
     .catch((err) => callback(err instanceof Error ? err : new Error(String(err))));
