@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Manifest } from "@rcd/protocol";
+import { OpenButton } from "./OpenButton";
 
 export function ManualMemoAudit({ manifest }: { manifest: Manifest }) {
   const rows = useMemo(() => {
@@ -10,6 +11,7 @@ export function ManualMemoAudit({ manifest }: { manifest: Manifest }) {
       fnLine: number;
       kind: "useMemo" | "useCallback" | "memo";
       line: number;
+      column: number;
     }> = [];
     for (const file of Object.values(manifest.files)) {
       for (const fn of file.functions) {
@@ -22,6 +24,7 @@ export function ManualMemoAudit({ manifest }: { manifest: Manifest }) {
             fnLine: fn.loc.start.line,
             kind: m.kind,
             line: m.loc.start.line,
+            column: m.loc.start.column + 1,
           });
         }
       }
@@ -62,7 +65,9 @@ export function ManualMemoAudit({ manifest }: { manifest: Manifest }) {
                 <td>
                   <code>{r.relativePath}</code>
                 </td>
-                <td>{r.line}</td>
+                <td>
+                  {r.line} <OpenButton filename={r.filename} line={r.line} column={r.column} />
+                </td>
               </tr>
             ))}
           </tbody>

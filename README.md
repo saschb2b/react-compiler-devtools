@@ -20,6 +20,7 @@ DevTools for the React Compiler (1.0+). See, per component, what the compiler di
 - **Files** — per-file list of every top-level function with its status, cache slot count, and any bailout/diagnostic the compiler emitted.
 - **Bailouts** — every skipped/errored function with reason, description, and (when available) the compiler's suggested fix.
 - **Manual memo audit** — every `useMemo` / `useCallback` / `React.memo` that lives inside a successfully compiled component. The compiler is already memoizing those — they're noise.
+- **Click-to-open in editor** — every row in Bailouts / Files / Audit has an open link that asks the dev server (Vite's `/__open-in-editor`) to launch your editor at the exact line. Set `EDITOR` / `LAUNCH_EDITOR` env if you want a non-default editor. Next.js wiring lands later.
 - **Runtime cache** — for every live `_c(N)` cache, hit/miss per slot per render. Live updating.
 
 ## How it works

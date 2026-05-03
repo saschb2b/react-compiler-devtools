@@ -20,6 +20,8 @@ import {
 export interface Transport {
   fetchManifest(): Promise<Manifest | null>;
   fetchSource(filename: string): Promise<SourcePair | null>;
+  /** Ask the dev server to launch the user's editor at the given location. */
+  openInEditor(filename: string, line?: number, column?: number): Promise<boolean>;
   onRuntimeMessage(handler: (msg: BridgeMessage) => void): () => void;
   postRuntimeMessage(msg: BridgeMessage): void;
 }
@@ -42,6 +44,18 @@ export function mountInPage(): Transport {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) return null;
       return (await res.json()) as SourcePair | null;
+    },
+    async openInEditor(filename, line, column) {
+      // Vite (and most React frameworks) ship `launch-editor-middleware` at this URL.
+      // The colon-separated suffix is the convention launch-editor parses.
+      const loc = line != null ? `:${line}${column != null ? `:${column}` : ""}` : "";
+      const url = `/__open-in-editor?file=${encodeURIComponent(filename + loc)}`;
+      try {
+        const res = await fetch(url);
+        return res.ok;
+      } catch {
+        return false;
+      }
     },
     onRuntimeMessage(handler) {
       const listener = (event: MessageEvent) => {

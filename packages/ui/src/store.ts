@@ -124,6 +124,13 @@ export function useStoreActions(): { refreshManifest: () => void; resetRuntime: 
   };
 }
 
+/** Returns a callback that asks the dev server to launch the user's editor. */
+export function useOpenInEditor(): (filename: string, line?: number, column?: number) => void {
+  return (filename, line, column) => {
+    transportRef?.openInEditor(filename, line, column);
+  };
+}
+
 /** Re-poll the manifest every `intervalMs` so HMR'd compiles show up. */
 export function useManifestPolling(intervalMs = 1500): void {
   const { refreshManifest } = useStoreActions();

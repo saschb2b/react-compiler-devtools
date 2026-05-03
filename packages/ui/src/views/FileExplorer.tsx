@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Manifest, ManifestFile, ManifestFunction } from "@rcd/protocol";
 import { useSourcePair } from "../store";
 import { SourceDiff } from "./SourceDiff";
+import { OpenButton } from "./OpenButton";
 
 export function FileExplorer({ manifest }: { manifest: Manifest }) {
   const files = useMemo(
@@ -91,7 +92,7 @@ function FileDetail({ file }: { file: ManifestFile }) {
               .slice()
               .sort((a, b) => a.loc.start.line - b.loc.start.line)
               .map((fn) => (
-                <FunctionCard key={fn.id} fn={fn} />
+                <FunctionCard key={fn.id} fn={fn} filename={file.filename} />
               ))}
           </ul>
         )
@@ -110,7 +111,7 @@ function FileDiffView({ filename }: { filename: string }) {
   return <SourceDiff pair={pair} />;
 }
 
-function FunctionCard({ fn }: { fn: ManifestFunction }) {
+function FunctionCard({ fn, filename }: { fn: ManifestFunction; filename: string }) {
   return (
     <li className={`rcd-fn rcd-fn-${fn.status}`}>
       <header>
@@ -119,6 +120,7 @@ function FunctionCard({ fn }: { fn: ManifestFunction }) {
           {" "}
           @ line {fn.loc.start.line}
         </span>
+        <OpenButton filename={filename} line={fn.loc.start.line} column={fn.loc.start.column + 1} />
         <span className={`rcd-pill rcd-pill-${fn.status}`}>{fn.status}</span>
         {fn.cacheSize != null && (
           <span className="rcd-pill" title="cache slots allocated">
@@ -131,6 +133,14 @@ function FunctionCard({ fn }: { fn: ManifestFunction }) {
           <div>
             <strong>{fn.bailout.reason}</strong>: {fn.bailout.description}
           </div>
+          {fn.bailout.loc && (
+            <OpenButton
+              filename={filename}
+              line={fn.bailout.loc.start.line}
+              column={fn.bailout.loc.start.column + 1}
+              label={`open offending line :${fn.bailout.loc.start.line}`}
+            />
+          )}
           {fn.bailout.suggestion && (
             <div className="rcd-suggestion">Suggestion: {fn.bailout.suggestion}</div>
           )}
@@ -142,7 +152,12 @@ function FunctionCard({ fn }: { fn: ManifestFunction }) {
           <ul>
             {fn.manualMemos.map((m, i) => (
               <li key={i}>
-                <code>{m.kind}</code> at line {m.loc.start.line} — likely redundant.
+                <code>{m.kind}</code> at line {m.loc.start.line} — likely redundant.{" "}
+                <OpenButton
+                  filename={filename}
+                  line={m.loc.start.line}
+                  column={m.loc.start.column + 1}
+                />
               </li>
             ))}
           </ul>

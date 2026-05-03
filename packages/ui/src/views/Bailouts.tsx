@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { Manifest, ManifestFunction } from "@rcd/protocol";
+import { OpenButton } from "./OpenButton";
 
 interface Row {
   fn: ManifestFunction;
@@ -62,7 +63,14 @@ export function Bailouts({ manifest }: { manifest: Manifest }) {
               <tr key={i}>
                 <td>
                   <strong>{r.fn.name ?? "(anonymous)"}</strong>
-                  <div className="rcd-muted">line {r.fn.loc.start.line}</div>
+                  <div className="rcd-muted">
+                    line {r.fn.loc.start.line}{" "}
+                    <OpenButton
+                      filename={r.filename}
+                      line={r.fn.bailout?.loc?.start.line ?? r.fn.loc.start.line}
+                      column={(r.fn.bailout?.loc?.start.column ?? r.fn.loc.start.column) + 1}
+                    />
+                  </div>
                 </td>
                 <td>
                   <code>{r.relativePath}</code>
