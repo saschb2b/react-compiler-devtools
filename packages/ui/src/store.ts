@@ -30,13 +30,16 @@ class Store {
     transport.postRuntimeMessage({ source: "rcd", kind: "request-snapshot" });
   }
 
-  getState(): State {
-    return this.state;
-  }
+  // Arrow class fields so React's useSyncExternalStore can call them without
+  // binding — `useSyncExternalStore(subscribe, getSnapshot)` invokes them
+  // bare, which would lose `this` for regular prototype methods.
+  getState = (): State => this.state;
 
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   };
 
   async refreshManifest(): Promise<void> {
