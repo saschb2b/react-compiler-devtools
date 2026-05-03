@@ -1,0 +1,13 @@
+node_modules
+dist
+.next
+.turbo
+.cache
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.local
+coverage
+.rcd-manifest.json
+packages/extension/dist-extension

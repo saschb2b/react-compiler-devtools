@@ -1,0 +1,24 @@
+{
+  "name": "react-compiler-devtools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevTools for the React Compiler: see what was compiled, what was skipped and why, and watch cache hits/misses live.",
+  "license": "MIT",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter \"./packages/*\" build",
+    "dev": "pnpm -r --parallel --filter \"./packages/*\" dev",
+    "typecheck": "pnpm -r --filter \"./packages/*\" typecheck",
+    "example:vite": "pnpm --filter @rcd/example-vite dev",
+    "example:next": "pnpm --filter @rcd/example-next dev",
+    "ui": "pnpm --filter @rcd/ui dev"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "@types/node": "^22.7.4",
+    "tsup": "^8.3.0"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@rcd/babel-preset",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --dts --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rcd/meta-plugin": "workspace:*"
+  },
+  "peerDependencies": {
+    "babel-plugin-react-compiler": "^1.0.0"
+  },
+  "devDependencies": {
+    "babel-plugin-react-compiler": "^1.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3"
+  }
+}

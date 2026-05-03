@@ -1,0 +1,36 @@
+{
+  "name": "@rcd/ui",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./standalone": {
+      "import": "./dist-standalone/index.html"
+    }
+  },
+  "files": ["dist", "dist-standalone"],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.lib.json && vite build && vite build --config vite.standalone.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rcd/protocol": "workspace:*",
+    "@rcd/runtime": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0"
+  }
+}
