@@ -28,13 +28,15 @@ export function getOrCreateGlobal(framework: RuntimeGlobal["framework"] = "unkno
     // patched `_c` only records on each call — there's no panel listening anyway.
     return makeGlobal(framework);
   }
-  if (!target[GLOBAL_KEY]) {
-    target[GLOBAL_KEY] = makeGlobal(framework);
-    installBridge(target, target[GLOBAL_KEY]);
-  } else if (target[GLOBAL_KEY].framework === "unknown" && framework !== "unknown") {
-    target[GLOBAL_KEY].framework = framework;
+  let existing = target[GLOBAL_KEY];
+  if (!existing) {
+    existing = makeGlobal(framework);
+    target[GLOBAL_KEY] = existing;
+    installBridge(target, existing);
+  } else if (existing.framework === "unknown" && framework !== "unknown") {
+    existing.framework = framework;
   }
-  return target[GLOBAL_KEY];
+  return existing;
 }
 
 function makeGlobal(framework: RuntimeGlobal["framework"]): RuntimeGlobal {

@@ -1,22 +1,24 @@
 import type { PluginObj, PluginPass, NodePath } from "@babel/core";
 import type * as BabelTypes from "@babel/types";
-import { MetaCollector } from "./index.js";
+import type { SourceLoc } from "@rcd/protocol";
+import type { MetaCollector } from "./index.js";
 
 export interface BabelMetaPluginState extends PluginPass {
-  opts: {
-    collector: MetaCollector;
-  };
+  opts: { collector: MetaCollector };
 }
 
 /**
- * Babel companion pass run AFTER `babel-plugin-react-compiler`. It walks the
- * source AST (not the compiler's output) to find `useMemo` / `useCallback` /
- * `React.memo` calls inside top-level functions that the compiler reports as
- * successfully compiled. These are likely redundant — the audit view in the
- * panel reads them.
+ * Babel companion pass. MUST be registered BEFORE `babel-plugin-react-compiler`
+ * so we walk the original source AST. The compiler rewrites `useMemo` /
+ * `useCallback` calls into cache-slot lookups, which would erase our findings.
  *
- * It also rewrites the function id space onto the canonical
- * `<filename>:<line>:<col>` form so the runtime can join.
+ * For every top-level function we see, we record:
+ *   • its name (so errored functions, which the compiler reports without a
+ *     name in `event.fnName`, still show up as "Foo" in the panel)
+ *   • any `useMemo` / `useCallback` / `memo` calls inside its body
+ *
+ * The collector merges these into the eventual manifest entry that the
+ * compiler's logger creates a few visitors later.
  */
 export default function rcdMetaCompanion(babel: { types: typeof BabelTypes }): PluginObj<BabelMetaPluginState> {
   const t = babel.types;
@@ -30,42 +32,82 @@ export default function rcdMetaCompanion(babel: { types: typeof BabelTypes }): P
         const collector = state.opts.collector;
         if (!collector) return;
 
-        const findings: Array<{ functionId: string; memo: { kind: "useMemo" | "useCallback" | "memo"; loc: { start: { line: number; column: number }; end: { line: number; column: number } } } }> = [];
-
         path.traverse({
-          CallExpression(callPath) {
-            const callee = callPath.node.callee;
-            const kind = identifyMemoCall(t, callee);
-            if (!kind) return;
-            const enclosing = enclosingTopLevelFunction(callPath);
-            if (!enclosing) return;
-            const fnLoc = enclosing.loc;
-            if (!fnLoc) return;
-            const callLoc = callPath.node.loc;
-            if (!callLoc) return;
-            const functionId = MetaCollector.functionId(filename, {
-              start: { line: fnLoc.start.line, column: fnLoc.start.column },
-              end: { line: fnLoc.end.line, column: fnLoc.end.column },
-            });
-            findings.push({
-              functionId,
-              memo: {
-                kind,
-                loc: {
-                  start: { line: callLoc.start.line, column: callLoc.start.column },
-                  end: { line: callLoc.end.line, column: callLoc.end.column },
-                },
-              },
-            });
+          "FunctionDeclaration|FunctionExpression|ArrowFunctionExpression"(fnPath: NodePath) {
+            // Top-level only — skip nested closures (they aren't compile units).
+            if (!isTopLevel(fnPath)) return;
+            const node = fnPath.node as
+              | BabelTypes.FunctionDeclaration
+              | BabelTypes.FunctionExpression
+              | BabelTypes.ArrowFunctionExpression;
+            if (!node.loc) return;
+            const loc = toLoc(node.loc);
+            const name = extractName(t, fnPath, node);
+            const manualMemos = findManualMemos(t, fnPath);
+            collector.observeFunction(filename, { name, loc, manualMemos });
           },
         });
-
-        if (findings.length > 0) {
-          collector.attachManualMemos(filename, findings);
-        }
       },
     },
   };
+}
+
+function isTopLevel(fnPath: NodePath): boolean {
+  let parent: NodePath | null = fnPath.parentPath;
+  while (parent) {
+    const t = parent.node.type;
+    if (t === "Program") return true;
+    if (
+      t === "FunctionDeclaration" ||
+      t === "FunctionExpression" ||
+      t === "ArrowFunctionExpression" ||
+      t === "ClassMethod" ||
+      t === "ObjectMethod"
+    ) {
+      return false;
+    }
+    parent = parent.parentPath;
+  }
+  return false;
+}
+
+function toLoc(loc: NonNullable<BabelTypes.Node["loc"]>): SourceLoc {
+  return {
+    start: { line: loc.start.line, column: loc.start.column },
+    end: { line: loc.end.line, column: loc.end.column },
+  };
+}
+
+function extractName(
+  t: typeof BabelTypes,
+  fnPath: NodePath,
+  node: BabelTypes.FunctionDeclaration | BabelTypes.FunctionExpression | BabelTypes.ArrowFunctionExpression,
+): string | null {
+  if (t.isFunctionDeclaration(node) && node.id) return node.id.name;
+  if ((t.isFunctionExpression(node) || t.isArrowFunctionExpression(node))) {
+    const parent = fnPath.parent;
+    if (t.isVariableDeclarator(parent) && t.isIdentifier(parent.id)) return parent.id.name;
+    if (t.isAssignmentExpression(parent) && t.isIdentifier(parent.left)) return parent.left.name;
+    if (t.isProperty(parent) && t.isIdentifier(parent.key)) return parent.key.name;
+  }
+  return null;
+}
+
+function findManualMemos(
+  t: typeof BabelTypes,
+  fnPath: NodePath,
+): Array<{ kind: "useMemo" | "useCallback" | "memo"; loc: SourceLoc }> {
+  const out: Array<{ kind: "useMemo" | "useCallback" | "memo"; loc: SourceLoc }> = [];
+  fnPath.traverse({
+    CallExpression(callPath) {
+      const kind = identifyMemoCall(t, callPath.node.callee);
+      if (!kind) return;
+      const callLoc = callPath.node.loc;
+      if (!callLoc) return;
+      out.push({ kind, loc: toLoc(callLoc) });
+    },
+  });
+  return out;
 }
 
 function identifyMemoCall(
@@ -84,27 +126,4 @@ function identifyMemoCall(
     if (callee.property.name === "memo") return "memo";
   }
   return null;
-}
-
-function enclosingTopLevelFunction(
-  path: NodePath,
-): BabelTypes.FunctionDeclaration | BabelTypes.FunctionExpression | BabelTypes.ArrowFunctionExpression | null {
-  let current: NodePath | null = path.parentPath;
-  let lastFn:
-    | BabelTypes.FunctionDeclaration
-    | BabelTypes.FunctionExpression
-    | BabelTypes.ArrowFunctionExpression
-    | null = null;
-  while (current) {
-    const n = current.node;
-    if (
-      n.type === "FunctionDeclaration" ||
-      n.type === "FunctionExpression" ||
-      n.type === "ArrowFunctionExpression"
-    ) {
-      lastFn = n;
-    }
-    current = current.parentPath;
-  }
-  return lastFn;
 }

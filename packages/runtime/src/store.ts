@@ -92,7 +92,7 @@ export class RuntimeStore {
     return {
       version: PROTOCOL_VERSION,
       takenAt: Date.now(),
-      caches: [...this.caches.values()].map((c) => ({
+      caches: [...this.caches.values()].map((c): CacheInstance => ({
         ...c,
         recentRenders: c.recentRenders.map((r) => ({ ...r, slots: r.slots.slice() })),
       })),

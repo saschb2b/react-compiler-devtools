@@ -103,6 +103,9 @@ export function reactCompilerDevtools(options: ReactCompilerDevtoolsOptions = {}
         babelrc: false,
         configFile: false,
         sourceMaps: true,
+        // Babel must parse TS/JSX syntax to feed the AST to the React Compiler. We don't
+        // strip either — `@vitejs/plugin-react` (which runs after us) handles that via esbuild.
+        parserOpts: { plugins: ["typescript", "jsx"] },
         ...rcdPreset({ collector, compilerOptions: options.compilerOptions }),
       });
 

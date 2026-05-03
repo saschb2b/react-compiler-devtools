@@ -19,8 +19,12 @@ export default function rcdPreset({ collector, compilerOptions = {} }: PresetOpt
     },
   };
 
+  // Order matters: the companion MUST run first so it sees the original AST
+  // (with `useMemo`/`useCallback` calls intact) before the React Compiler
+  // rewrites them into cache-slot lookups.
   return {
     plugins: [
+      [companion, { collector }],
       [
         "babel-plugin-react-compiler",
         {
@@ -30,7 +34,6 @@ export default function rcdPreset({ collector, compilerOptions = {} }: PresetOpt
           logger,
         },
       ],
-      [companion, { collector }],
     ],
   };
 }

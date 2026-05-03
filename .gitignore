@@ -11,3 +11,4 @@ dist
 coverage
 .rcd-manifest.json
 packages/extension/dist-extension
+packages/ui/dist-standalone/

@@ -56,11 +56,23 @@ export interface CompilerLogger {
  * runs (HMR, watch mode) overwrite per-file entries so the manifest always
  * reflects the most recent compilation.
  */
+interface ObservedFunction {
+  name: string | null;
+  loc: SourceLoc;
+  manualMemos: ManifestFunction["manualMemos"];
+}
+
 export class MetaCollector {
   private readonly options: Required<Omit<MetaCollectorOptions, "outFile" | "onUpdate">> &
     Pick<MetaCollectorOptions, "outFile" | "onUpdate">;
   private manifest: Manifest;
   private writeScheduled = false;
+  /**
+   * Per-file map of `:line:col` → name + manual memos discovered by the babel
+   * companion BEFORE the React Compiler ran. The compiler's logger events
+   * enrich themselves from this cache when it's their turn.
+   */
+  private observed = new Map<string, Map<string, ObservedFunction>>();
 
   constructor(options: MetaCollectorOptions) {
     this.options = {
@@ -79,26 +91,46 @@ export class MetaCollector {
   /** Drop everything we've collected for `filename`. Call this before re-compiling a changed file. */
   resetFile(filename: string): void {
     const file = this.manifest.files[filename];
-    if (!file) return;
-    this.subtractFromSummary(file);
-    delete this.manifest.files[filename];
+    if (file) {
+      this.subtractFromSummary(file);
+      delete this.manifest.files[filename];
+    }
+    this.observed.delete(filename);
     this.scheduleWrite();
+  }
+
+  /** Called by the babel companion (which runs first) for every top-level component-shaped function. */
+  observeFunction(filename: string, fn: ObservedFunction): void {
+    let map = this.observed.get(filename);
+    if (!map) {
+      map = new Map();
+      this.observed.set(filename, map);
+    }
+    const id = `:${fn.loc.start.line}:${fn.loc.start.column}`;
+    const existing = map.get(id);
+    if (existing) {
+      existing.manualMemos.push(...fn.manualMemos);
+      if (!existing.name) existing.name = fn.name;
+    } else {
+      map.set(id, { ...fn, manualMemos: [...fn.manualMemos] });
+    }
   }
 
   /** The babel plugin calls this for every Compiler event keyed to `filename`. */
   recordEvent(filename: string | null, event: CompilerLoggerEvent): void {
     if (!filename) return;
     const file = this.ensureFile(filename);
+    const observed = this.observed.get(filename);
 
     switch (event.kind) {
       case "CompileSuccess":
-        this.upsertFunction(file, makeCompiledFunction(event));
+        this.upsertFunction(file, this.enrich(makeCompiledFunction(event), observed));
         break;
       case "CompileError":
-        this.upsertFunction(file, makeErroredFunction(event));
+        this.upsertFunction(file, this.enrich(makeErroredFunction(event), observed));
         break;
       case "CompileSkip":
-        this.upsertFunction(file, makeSkippedFunction(event));
+        this.upsertFunction(file, this.enrich(makeSkippedFunction(event), observed));
         break;
       case "CompileDiagnostic":
         this.attachDiagnostic(file, event);
@@ -132,27 +164,11 @@ export class MetaCollector {
     this.scheduleWrite();
   }
 
-  /** Called by the babel companion pass to attach manual-memo findings discovered by AST walk. */
-  attachManualMemos(
-    filename: string,
-    findings: Array<{ functionId: string; memo: ManifestFunction["manualMemos"][number] }>,
-  ): void {
-    const file = this.manifest.files[filename];
-    if (!file) return;
-    for (const { functionId, memo } of findings) {
-      const fn = file.functions.find((f) => f.id === functionId);
-      if (fn && fn.status === "compiled") fn.manualMemos.push(memo);
-    }
-    this.recomputeSummary();
-    this.scheduleWrite();
-  }
-
   /**
    * Stable in-file id matching what `makeCompiledFunction` / `makeSkippedFunction` generate.
-   * Filenames aren't part of the id — functions are always looked up under their owning file
-   * in the manifest tree.
+   * Filenames aren't part of the id — functions are always looked up under their owning file.
    */
-  static functionId(_filename: string, loc: SourceLoc | null | undefined): string {
+  static functionId(loc: SourceLoc | null | undefined): string {
     if (!loc) return ":?";
     return `:${loc.start.line}:${loc.start.column}`;
   }
@@ -176,6 +192,24 @@ export class MetaCollector {
     const idx = file.functions.findIndex((f) => f.id === fn.id);
     if (idx === -1) file.functions.push(fn);
     else file.functions[idx] = { ...file.functions[idx], ...fn };
+  }
+
+  /** Fill in name + manual memos from the companion's pre-compile observation cache. */
+  private enrich(
+    fn: ManifestFunction,
+    observed: Map<string, ObservedFunction> | undefined,
+  ): ManifestFunction {
+    if (!observed) return fn;
+    const hit = observed.get(fn.id);
+    if (!hit) return fn;
+    return {
+      ...fn,
+      name: fn.name ?? hit.name,
+      // Manual memos only matter when the function was actually compiled — but we
+      // attach them to skipped/errored entries too so the audit view can show
+      // "this function would benefit from compiling, and it has redundant memos".
+      manualMemos: [...fn.manualMemos, ...hit.manualMemos],
+    };
   }
 
   private attachDiagnostic(file: ManifestFile, event: CompilerLoggerEvent): void {
@@ -210,7 +244,7 @@ export class MetaCollector {
       for (const fn of file.functions) {
         summary.totalFunctions++;
         summary[fn.status]++;
-        if (fn.status === "skipped" && fn.bailout) {
+        if ((fn.status === "skipped" || fn.status === "errored") && fn.bailout) {
           summary.bailoutsByReason[fn.bailout.reason] =
             (summary.bailoutsByReason[fn.bailout.reason] ?? 0) + 1;
         }

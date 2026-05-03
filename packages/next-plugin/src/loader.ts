@@ -38,6 +38,7 @@ function rcdLoader(this: LoaderContext, source: string): void {
     babelrc: false,
     configFile: false,
     sourceMaps: true,
+    parserOpts: { plugins: ["typescript", "jsx"] },
     ...rcdPreset({ collector, compilerOptions }),
   })
     .then((result) => {

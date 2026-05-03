@@ -12,14 +12,15 @@
     },
     "./loader": {
       "types": "./dist/loader.d.ts",
-      "import": "./dist/loader.js",
-      "require": "./dist/loader.cjs"
+      "import": "./dist/loader.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsup src/index.ts src/loader.ts --format esm,cjs --dts --clean",
-    "dev": "tsup src/index.ts src/loader.ts --format esm,cjs --dts --watch",
+    "build": "tsup src/index.ts src/loader.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/loader.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "next": "^15.0.0"
   },
   "devDependencies": {
+    "@types/babel__core": "^7.20.5",
     "next": "^15.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.3"
