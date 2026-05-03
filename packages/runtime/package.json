@@ -23,11 +23,14 @@
       "import": "./dist/bridge.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/index.ts src/shim.ts src/bootstrap.ts src/bridge.ts --format esm --dts --clean",
     "dev": "tsup src/index.ts src/shim.ts src/bootstrap.ts src/bridge.ts --format esm --dts --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node test-smoke.mjs"
   },
   "dependencies": {
     "@rcd/protocol": "workspace:*"
@@ -37,6 +40,7 @@
   },
   "devDependencies": {
     "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.3"
   }

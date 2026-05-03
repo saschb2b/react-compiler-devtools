@@ -10,33 +10,39 @@ export interface RuntimeGlobal {
   framework?: "vite" | "next" | "unknown";
 }
 
-interface WindowWithRuntime {
+interface GlobalWithRuntime {
   [GLOBAL_KEY]?: RuntimeGlobal;
-  postMessage(message: BridgeMessage, targetOrigin: string): void;
-  addEventListener(
+  postMessage?: (message: BridgeMessage, targetOrigin: string) => void;
+  addEventListener?: (
     event: "message",
     handler: (event: MessageEvent<BridgeMessage>) => void,
-  ): void;
+  ) => void;
 }
 
-const target: WindowWithRuntime | undefined =
-  typeof window !== "undefined" ? (window as unknown as WindowWithRuntime) : undefined;
+// `globalThis` is universal — `window` in the browser, `global` in Node, `self` in workers.
+// Keeping the runtime instance on `globalThis` lets server-rendering, smoke tests, and the
+// browser all see one consistent store across imports.
+const target = globalThis as unknown as GlobalWithRuntime;
+const hasWindowAPI = typeof window !== "undefined";
 
 export function getOrCreateGlobal(framework: RuntimeGlobal["framework"] = "unknown"): RuntimeGlobal {
-  if (!target) {
-    // SSR / Node: return a detached store. The runtime is a no-op server-side because the
-    // patched `_c` only records on each call — there's no panel listening anyway.
-    return makeGlobal(framework);
-  }
   let existing = target[GLOBAL_KEY];
   if (!existing) {
     existing = makeGlobal(framework);
     target[GLOBAL_KEY] = existing;
-    installBridge(target, existing);
+    if (hasWindowAPI) installBridge(window as unknown as WindowAPI, existing);
   } else if (existing.framework === "unknown" && framework !== "unknown") {
     existing.framework = framework;
   }
   return existing;
+}
+
+interface WindowAPI {
+  postMessage: (message: BridgeMessage, targetOrigin: string) => void;
+  addEventListener: (
+    event: "message",
+    handler: (event: MessageEvent<BridgeMessage>) => void,
+  ) => void;
 }
 
 function makeGlobal(framework: RuntimeGlobal["framework"]): RuntimeGlobal {
@@ -48,7 +54,7 @@ function makeGlobal(framework: RuntimeGlobal["framework"]): RuntimeGlobal {
   };
 }
 
-function installBridge(win: WindowWithRuntime, runtime: RuntimeGlobal): void {
+function installBridge(win: WindowAPI, runtime: RuntimeGlobal): void {
   win.postMessage({ source: "rcd", kind: "ready", payload: { protocolVersion: PROTOCOL_VERSION } }, "*");
 
   win.addEventListener("message", (event) => {
